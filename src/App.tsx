@@ -378,7 +378,9 @@ export const App: React.FC = () => {
 
     saveMatch(updatedMatch);
     setActiveMatch(updatedMatch);
-    showToast(`Toss recorded: ${winnerTeam.name} elected to ${decision}.`);
+    setShowTossModal(false);
+    setShowOpeningModal(true);
+    showToast(`Toss recorded: ${winnerTeam.name} elected to ${decision}. Now choose opening lineup.`);
   };
 
   // Select Bowler for over
@@ -613,6 +615,7 @@ export const App: React.FC = () => {
             onOpenDeliveryEditModal={() => setShowDeliveryEditModal(true)}
             onSwapStrikeManually={handleSwapStrikeManually}
             onCommentaryClick={() => setActiveTab('commentary')}
+            onOpenOpeningModal={() => setShowOpeningModal(true)}
           />
         )}
 
@@ -709,6 +712,7 @@ export const App: React.FC = () => {
           inningsNumber={activeMatch.innings1.status === 'innings_break' || activeMatch.innings2.status !== 'not_started' ? 2 : 1}
           isOpen={showOpeningModal}
           onConfirm={handleConfirmOpeners}
+          onClose={() => setShowOpeningModal(false)}
         />
       )}
 

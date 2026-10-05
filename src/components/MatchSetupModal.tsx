@@ -6,20 +6,16 @@ import {
   Player,
   PlayerRole,
   BattingStyle,
-  BowlingStyle,
 } from '../types/cricket';
-import { PRESET_TEAMS, cloneTeam } from '../data/presetTeams';
-import { calculateInningsState } from '../engine/scoringEngine';
+import { cloneTeam } from '../data/presetTeams';
 import {
   CheckCircle,
-  Plus,
-  Trash2,
   Users,
-  Shield,
-  Zap,
   Sparkles,
   ArrowRight,
   ArrowLeft,
+  Edit2,
+  Shield,
 } from 'lucide-react';
 import { sounds } from '../engine/audioEffects';
 
@@ -34,10 +30,15 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
   onClose,
   onCreateMatch,
 }) => {
-  const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Match Info & Format, 2: Team A, 3: Team B
+  const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Match & Teams Overview, 2: Team A Squad, 3: Team B Squad
 
-  const [matchName, setMatchName] = useState('Final - World Championship 2026');
-  const [seriesName, setSeriesName] = useState('Global T20 Championship');
+  const [teamAName, setTeamAName] = useState('India');
+  const [teamAShort, setTeamAShort] = useState('IND');
+  const [teamBName, setTeamBName] = useState('Australia');
+  const [teamBShort, setTeamBShort] = useState('AUS');
+
+  const [matchName, setMatchName] = useState('India vs Australia - Super 8 Clash');
+  const [seriesName, setSeriesName] = useState('ICC World Championship 2026');
   const [matchDate, setMatchDate] = useState(
     new Date().toISOString().split('T')[0]
   );
@@ -55,6 +56,7 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
 
   // Handle format change
   const handleFormatChange = (fmt: MatchFormat) => {
+    sounds.playTap();
     setFormat(fmt);
     if (fmt === 'T10') {
       setCustomOvers(10);
@@ -75,7 +77,25 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
     const clonedB = cloneTeam(presetB, `team-b-${Date.now()}`);
     setTeamA(clonedA);
     setTeamB(clonedB);
+    setTeamAName(clonedA.name);
+    setTeamAShort(clonedA.shortName);
+    setTeamBName(clonedB.name);
+    setTeamBShort(clonedB.shortName);
     setMatchName(`${clonedA.name} vs ${clonedB.name}`);
+  };
+
+  // Update Team A Name
+  const handleTeamANameChange = (newName: string) => {
+    setTeamAName(newName);
+    setTeamA((prev) => ({ ...prev, name: newName }));
+    setMatchName(`${newName} vs ${teamBName}`);
+  };
+
+  // Update Team B Name
+  const handleTeamBNameChange = (newName: string) => {
+    setTeamBName(newName);
+    setTeamB((prev) => ({ ...prev, name: newName }));
+    setMatchName(`${teamAName} vs ${newName}`);
   };
 
   // Update a player in a team
@@ -92,11 +112,9 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
       if (p.id === playerId) {
         return { ...p, [field]: value };
       }
-      // If setting Captain, remove captain from others
       if (field === 'isCaptain' && value === true) {
         return { ...p, isCaptain: false };
       }
-      // If setting Wicketkeeper, remove from others
       if (field === 'isWicketkeeper' && value === true) {
         return { ...p, isWicketkeeper: false };
       }
@@ -106,32 +124,14 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
     setTargetTeam({ ...targetTeam, playingXI: updatedXI });
   };
 
-  // Move player between XI and substitutes
-  const swapPlayerWithSub = (
-    teamType: 'A' | 'B',
-    xiPlayerId: string,
-    subPlayerId: string
-  ) => {
-    sounds.playTap();
-    const targetTeam = teamType === 'A' ? teamA : teamB;
-    const setTargetTeam = teamType === 'A' ? setTeamA : setTeamB;
-
-    const xiPlayer = targetTeam.playingXI.find((p) => p.id === xiPlayerId);
-    const subPlayer = targetTeam.substitutes.find((p) => p.id === subPlayerId);
-
-    if (!xiPlayer || !subPlayer) return;
-
-    setTargetTeam({
-      ...targetTeam,
-      playingXI: targetTeam.playingXI.map((p) => (p.id === xiPlayerId ? subPlayer : p)),
-      substitutes: targetTeam.substitutes.map((p) => (p.id === subPlayerId ? xiPlayer : p)),
-    });
-  };
-
   // Validation
   const validateMatch = (): boolean => {
-    if (!matchName.trim()) {
-      setValidationError('Please enter a match name.');
+    if (!teamAName.trim()) {
+      setValidationError('Please enter Team A name.');
+      return false;
+    }
+    if (!teamBName.trim()) {
+      setValidationError('Please enter Team B name.');
       return false;
     }
     if (!venue.trim()) {
@@ -180,6 +180,18 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
         ? 10
         : Number(customMaxPerBowler);
 
+    const finalTeamA: Team = {
+      ...teamA,
+      name: teamAName,
+      shortName: teamAShort.toUpperCase(),
+    };
+
+    const finalTeamB: Team = {
+      ...teamB,
+      name: teamBName,
+      shortName: teamBShort.toUpperCase(),
+    };
+
     const emptyMatch: Match = {
       id: matchId,
       name: matchName,
@@ -189,14 +201,14 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
       format,
       totalOvers,
       maxOversPerBowler,
-      teamA,
-      teamB,
+      teamA: finalTeamA,
+      teamB: finalTeamB,
       toss: null,
       status: 'toss',
       innings1: {
         inningsNumber: 1,
-        battingTeamId: teamA.id,
-        bowlingTeamId: teamB.id,
+        battingTeamId: finalTeamA.id,
+        bowlingTeamId: finalTeamB.id,
         status: 'not_started',
         totalRuns: 0,
         wickets: 0,
@@ -221,8 +233,8 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
       },
       innings2: {
         inningsNumber: 2,
-        battingTeamId: teamB.id,
-        bowlingTeamId: teamA.id,
+        battingTeamId: finalTeamB.id,
+        bowlingTeamId: finalTeamA.id,
         status: 'not_started',
         totalRuns: 0,
         wickets: 0,
@@ -255,27 +267,37 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
 
   const renderTeamEditor = (teamType: 'A' | 'B') => {
     const targetTeam = teamType === 'A' ? teamA : teamB;
-    const setTargetTeam = teamType === 'A' ? setTeamA : setTeamB;
+    const teamName = teamType === 'A' ? teamAName : teamBName;
+    const teamShort = teamType === 'A' ? teamAShort : teamBShort;
+    const setTeamName = teamType === 'A' ? handleTeamANameChange : handleTeamBNameChange;
+    const setTeamShort = teamType === 'A' ? setTeamAShort : setTeamBShort;
 
     return (
       <div>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', marginBottom: '16px' }}>
           <div>
-            <label className="form-label">Team Name</label>
+            <label className="form-label" style={{ fontWeight: 700 }}>
+              {teamType === 'A' ? 'Team A Name' : 'Team B Name'}
+            </label>
             <input
               type="text"
-              value={targetTeam.name}
-              onChange={(e) => setTargetTeam({ ...targetTeam, name: e.target.value })}
-              style={{ width: '100%' }}
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+              placeholder="e.g. Mumbai Indians"
+              style={{ width: '100%', fontSize: '1rem', fontWeight: 600 }}
             />
           </div>
           <div>
-            <label className="form-label">Short Code</label>
+            <label className="form-label" style={{ fontWeight: 700 }}>
+              Short Code
+            </label>
             <input
               type="text"
-              value={targetTeam.shortName}
-              onChange={(e) => setTargetTeam({ ...targetTeam, shortName: e.target.value })}
-              style={{ width: '100%' }}
+              value={teamShort}
+              onChange={(e) => setTeamShort(e.target.value.toUpperCase())}
+              placeholder="e.g. MI"
+              maxLength={5}
+              style={{ width: '100%', fontSize: '1rem', fontWeight: 700 }}
             />
           </div>
         </div>
@@ -285,17 +307,17 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
             PLAYING XI ({targetTeam.playingXI.length}/11)
           </h4>
           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Designate C, VC, and WK
+            Edit player names, jersey numbers, and toggle Captain (C) / Wicketkeeper (WK)
           </span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto' }}>
           {targetTeam.playingXI.map((player, idx) => (
             <div
               key={player.id}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '30px 1.5fr 70px 1.2fr 1.2fr 100px',
+                gridTemplateColumns: '24px 1.6fr 65px 1.1fr 1.1fr 85px',
                 gap: '8px',
                 alignItems: 'center',
                 background: 'var(--bg-elevated)',
@@ -310,6 +332,7 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
                 value={player.name}
                 onChange={(e) => updatePlayer(teamType, player.id, 'name', e.target.value)}
                 style={{ padding: '4px 8px', fontSize: '0.85rem' }}
+                placeholder="Player Name"
               />
               <input
                 type="number"
@@ -373,11 +396,11 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
           ))}
         </div>
 
-        {/* Substitutes section */}
+        {/* Substitutes */}
         {targetTeam.substitutes.length > 0 && (
           <div style={{ marginTop: '16px' }}>
             <h5 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
-              Substitutes / Bench ({targetTeam.substitutes.length})
+              Substitutes / Reserves ({targetTeam.substitutes.length})
             </h5>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {targetTeam.substitutes.map((sub) => (
@@ -407,9 +430,47 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
         <div className="modal-header">
           <div>
             <h2 style={{ fontSize: '1.35rem', fontWeight: 800 }}>Create New Cricket Match</h2>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Step {step} of 3: {step === 1 ? 'Match Details & Overs' : step === 2 ? `Configure ${teamA.name}` : `Configure ${teamB.name}`}
-            </p>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+              <button
+                type="button"
+                className={`btn-secondary ${step === 1 ? 'active' : ''}`}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.75rem',
+                  borderColor: step === 1 ? 'var(--pitch-green)' : 'var(--border-subtle)',
+                  color: step === 1 ? 'var(--pitch-green)' : 'inherit',
+                }}
+                onClick={() => setStep(1)}
+              >
+                1. Match & Teams Setup
+              </button>
+              <button
+                type="button"
+                className={`btn-secondary ${step === 2 ? 'active' : ''}`}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.75rem',
+                  borderColor: step === 2 ? 'var(--pitch-green)' : 'var(--border-subtle)',
+                  color: step === 2 ? 'var(--pitch-green)' : 'inherit',
+                }}
+                onClick={() => setStep(2)}
+              >
+                2. {teamAName} Squad ({teamA.playingXI.length})
+              </button>
+              <button
+                type="button"
+                className={`btn-secondary ${step === 3 ? 'active' : ''}`}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.75rem',
+                  borderColor: step === 3 ? 'var(--pitch-green)' : 'var(--border-subtle)',
+                  color: step === 3 ? 'var(--pitch-green)' : 'inherit',
+                }}
+                onClick={() => setStep(3)}
+              >
+                3. {teamBName} Squad ({teamB.playingXI.length})
+              </button>
+            </div>
           </div>
           <button type="button" className="btn-secondary" onClick={onClose} style={{ padding: '6px 12px' }}>
             Cancel
@@ -464,7 +525,7 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
                     style={{ fontSize: '0.8rem', padding: '6px 12px' }}
                     onClick={() => handleLoadPresetMatch('team-csk', 'team-mi')}
                   >
-                    🟡 CSK vs 🔵 MI (El Clásico)
+                    🟡 CSK vs 🔵 MI (IPL)
                   </button>
                   <button
                     type="button"
@@ -474,6 +535,114 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
                   >
                     🇮🇳 India vs 🏴󠁧󠁢󠁥󠁮󠁧󠁿 England
                   </button>
+                </div>
+              </div>
+
+              {/* DIRECT TEAM NAMES SETUP - FRONT AND CENTER */}
+              <div
+                style={{
+                  background: 'rgba(0, 230, 118, 0.05)',
+                  border: '1px solid rgba(0, 230, 118, 0.25)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '18px',
+                  marginBottom: '20px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                  <Shield size={18} color="var(--pitch-green)" />
+                  <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--pitch-green)' }}>
+                    TEAMS CONFIGURATION
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  {/* Team A */}
+                  <div
+                    style={{
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '14px',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--pitch-green)', marginBottom: '8px' }}>
+                      TEAM A
+                    </div>
+                    <div style={{ marginBottom: '10px' }}>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Team Name</label>
+                      <input
+                        type="text"
+                        value={teamAName}
+                        onChange={(e) => handleTeamANameChange(e.target.value)}
+                        placeholder="e.g. India"
+                        style={{ width: '100%', fontWeight: 700, fontSize: '1rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Short Code</label>
+                      <input
+                        type="text"
+                        value={teamAShort}
+                        onChange={(e) => setTeamAShort(e.target.value.toUpperCase())}
+                        placeholder="e.g. IND"
+                        maxLength={5}
+                        style={{ width: '100%', fontWeight: 700 }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ marginTop: '10px', width: '100%', fontSize: '0.75rem', padding: '6px' }}
+                      onClick={() => setStep(2)}
+                    >
+                      <Edit2 size={12} />
+                      <span>Edit {teamAName} Players ({teamA.playingXI.length})</span>
+                    </button>
+                  </div>
+
+                  {/* Team B */}
+                  <div
+                    style={{
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '14px',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--sky-blue)', marginBottom: '8px' }}>
+                      TEAM B
+                    </div>
+                    <div style={{ marginBottom: '10px' }}>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Team Name</label>
+                      <input
+                        type="text"
+                        value={teamBName}
+                        onChange={(e) => handleTeamBNameChange(e.target.value)}
+                        placeholder="e.g. Australia"
+                        style={{ width: '100%', fontWeight: 700, fontSize: '1rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Short Code</label>
+                      <input
+                        type="text"
+                        value={teamBShort}
+                        onChange={(e) => setTeamBShort(e.target.value.toUpperCase())}
+                        placeholder="e.g. AUS"
+                        maxLength={5}
+                        style={{ width: '100%', fontWeight: 700 }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ marginTop: '10px', width: '100%', fontSize: '0.75rem', padding: '6px' }}
+                      onClick={() => setStep(3)}
+                    >
+                      <Edit2 size={12} />
+                      <span>Edit {teamBName} Players ({teamB.playingXI.length})</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -590,40 +759,43 @@ export const MatchSetupModal: React.FC<MatchSetupModalProps> = ({
           {step === 3 && renderTeamEditor('B')}
         </div>
 
-        <div className="modal-footer">
-          {step > 1 && (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                sounds.playTap();
-                setStep((s) => (s - 1) as 1 | 2);
-              }}
-            >
-              <ArrowLeft size={16} />
-              <span>Back</span>
-            </button>
-          )}
+        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+          <div>
+            {step > 1 ? (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  sounds.playTap();
+                  setStep(1);
+                }}
+              >
+                <ArrowLeft size={16} />
+                <span>Back to Overview</span>
+              </button>
+            ) : null}
+          </div>
 
-          {step < 3 ? (
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => {
-                if (step === 1 && !validateMatch()) return;
-                sounds.playTap();
-                setStep((s) => (s + 1) as 2 | 3);
-              }}
-            >
-              <span>Next: {step === 1 ? `Configure ${teamA.name}` : `Configure ${teamB.name}`}</span>
-              <ArrowRight size={16} />
-            </button>
-          ) : (
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {step === 1 ? (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  sounds.playTap();
+                  setStep(2);
+                }}
+              >
+                <span>Edit Squads & Players</span>
+                <ArrowRight size={16} />
+              </button>
+            ) : null}
+
             <button type="button" className="btn-primary" onClick={handleFinishCreate}>
               <CheckCircle size={18} />
-              <span>Save & Proceed to Toss</span>
+              <span>Create Match & Proceed to Toss</span>
             </button>
-          )}
+          </div>
         </div>
       </div>
     </div>

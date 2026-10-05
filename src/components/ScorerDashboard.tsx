@@ -33,6 +33,7 @@ interface ScorerDashboardProps {
   onOpenDeliveryEditModal: () => void;
   onSwapStrikeManually: () => void;
   onCommentaryClick: () => void;
+  onOpenOpeningModal: () => void;
 }
 
 export const ScorerDashboard: React.FC<ScorerDashboardProps> = ({
@@ -45,6 +46,7 @@ export const ScorerDashboard: React.FC<ScorerDashboardProps> = ({
   onOpenDeliveryEditModal,
   onSwapStrikeManually,
   onCommentaryClick,
+  onOpenOpeningModal,
 }) => {
   const is2nd = match.innings2.status !== 'not_started';
   const innings: InningsState = is2nd ? match.innings2 : match.innings1;
@@ -188,13 +190,23 @@ export const ScorerDashboard: React.FC<ScorerDashboardProps> = ({
             </span>
           </div>
           {innings.deliveries.length === 0 && (
-            <button
-              className="btn-secondary"
-              style={{ padding: '3px 10px', fontSize: '0.75rem' }}
-              onClick={onOpenTossModal}
-            >
-              Edit Toss
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                className="btn-primary"
+                style={{ padding: '4px 12px', fontSize: '0.78rem' }}
+                onClick={onOpenOpeningModal}
+              >
+                <UserCheck size={14} />
+                <span>Choose / Change Openers</span>
+              </button>
+              <button
+                className="btn-secondary"
+                style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                onClick={onOpenTossModal}
+              >
+                Edit Toss
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -262,6 +274,23 @@ export const ScorerDashboard: React.FC<ScorerDashboardProps> = ({
 
           {/* 2. Active Batters & Bowler Card */}
           <div className="active-players-card">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                CURRENT BATTERS ({battingTeam.shortName})
+              </span>
+              {innings.deliveries.length === 0 && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ padding: '3px 10px', fontSize: '0.75rem', borderColor: 'var(--pitch-green)', color: 'var(--pitch-green)' }}
+                  onClick={onOpenOpeningModal}
+                >
+                  <UserCheck size={13} />
+                  <span>Choose Openers</span>
+                </button>
+              )}
+            </div>
+
             <table className="batters-table">
               <thead>
                 <tr>
@@ -275,7 +304,16 @@ export const ScorerDashboard: React.FC<ScorerDashboardProps> = ({
               </thead>
               <tbody>
                 {/* Striker */}
-                <tr style={{ background: 'rgba(0, 230, 118, 0.05)' }}>
+                <tr
+                  style={{
+                    background: 'rgba(0, 230, 118, 0.05)',
+                    cursor: innings.deliveries.length === 0 ? 'pointer' : 'default',
+                  }}
+                  onClick={() => {
+                    if (innings.deliveries.length === 0) onOpenOpeningModal();
+                  }}
+                  title={innings.deliveries.length === 0 ? 'Click to select / change striker' : undefined}
+                >
                   <td>
                     <div className="batter-name-cell">
                       <span className="striker-indicator">🏏</span>
@@ -303,7 +341,15 @@ export const ScorerDashboard: React.FC<ScorerDashboardProps> = ({
                 </tr>
 
                 {/* Non-Striker */}
-                <tr>
+                <tr
+                  style={{
+                    cursor: innings.deliveries.length === 0 ? 'pointer' : 'default',
+                  }}
+                  onClick={() => {
+                    if (innings.deliveries.length === 0) onOpenOpeningModal();
+                  }}
+                  title={innings.deliveries.length === 0 ? 'Click to select / change non-striker' : undefined}
+                >
                   <td>
                     <div className="batter-name-cell">
                       <span style={{ opacity: 0 }}>🏏</span>
@@ -493,6 +539,19 @@ export const ScorerDashboard: React.FC<ScorerDashboardProps> = ({
             {/* Quick Helper Tools */}
             <div className="quick-tools-bar">
               <div style={{ display: 'flex', gap: '8px' }}>
+                {innings.deliveries.length === 0 && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ fontSize: '0.8rem', padding: '6px 12px', borderColor: 'var(--pitch-green)', color: 'var(--pitch-green)' }}
+                    onClick={onOpenOpeningModal}
+                    title="Select Opening Batters and Bowler"
+                  >
+                    <UserCheck size={14} />
+                    <span>Select Openers</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   className="btn-secondary"
